@@ -310,7 +310,8 @@ async function sendMessage() {
 				sender: currentUser,
 				content,
 				file_url: fileData?.url,
-				file_name: fileData?.name
+				file_name: fileData?.name,
+				file_type: fileData?.type
 			})
 		});
 	}
@@ -403,7 +404,9 @@ async function loadMessages() {
 
 		// file handling
 		if (msg.file_url) {
-			const isImage = msg.file_type?.startsWith("image/");
+			const isImage =
+				msg.file_type?.startsWith("image/") ||
+				msg.file_url?.match(/\.(png|jpg|jpeg|gif|webp)$/i);
 
 			if (isImage) {
 				const img = document.createElement("img");
