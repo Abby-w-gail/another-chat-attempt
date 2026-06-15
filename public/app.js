@@ -1,6 +1,8 @@
 let currentUser = null;
 let activeChatUser = null;
 
+let activeGroupId = null;
+
 /* ---------------- init ---------------- */
 window.onload = () => {
 	const saved = localStorage.getItem("user");
@@ -9,6 +11,7 @@ window.onload = () => {
 		currentUser = saved;
 		renderApp();
 		loadQuickDials();
+		loadGroups();
 	} else {
 		renderLogin();
 	}
@@ -40,13 +43,16 @@ function renderApp() {
 	</div>
 
 	<div class="chatContainer">
+		
 
 		<div class="sidebar">
+		
 			<h3>users</h3>
-
+	
 			<input id="receiver" placeholder="username">
 			<button onclick="openChat()">open chat</button>
 			<button onclick="addQuickDial()">add quickdial</button>
+			<button onclick="openGroupCreator()">create group</button>
 		</div>
 
 		<div class="chat">
@@ -60,6 +66,8 @@ function renderApp() {
 		</div>
 
 		<div class="quickdial">
+			<h3>groups</h3>
+			<div id="groupList"></div>
 			<h3>get yo real ones on quick dial</h3>
 			<div id="quickList"></div>
 		</div>
@@ -85,6 +93,137 @@ function openSettings() {
 
 function closeSettings() {
 	document.getElementById("settingsModal")?.remove();
+}
+
+/* --------------- group creator ----------------------- */
+
+function openGroupCreator() {
+	document.body.insertAdjacentHTML("beforeend", `
+	<div class="center" id="groupModal">
+		<div class="card">
+
+			<h3>create group</h3>
+
+			<input id="groupName" placeholder="group name">
+
+			<div id="memberList">
+				<input placeholder="member 1">
+				<input placeholder="member 2">
+			</div>
+
+			<button onclick="addMemberInput()">+ add member</button>
+			<button onclick="submitGroup()">create</button>
+			<button onclick="document.getElementById('groupModal').remove()">close</button>
+
+		</div>
+	</div>
+	`);
+}
+
+function addMemberInput() {
+	const box = document.getElementById("memberList");
+
+	if (box.children.length >= 10) {
+		alert("max 10 members");
+		return;
+	}
+
+	const input = document.createElement("input");
+	input.placeholder = `member ${box.children.length + 1}`;
+	box.appendChild(input);
+}
+
+async function submitGroup() {
+	const name = document.getElementById("groupName").value;
+	const inputs = document.querySelectorAll("#memberList input");
+
+	const members = [];
+
+	for (let i = 0; i < inputs.length; i++) {
+		if (inputs[i].value.trim()) {
+			members.push(inputs[i].value.toLowerCase());
+		}
+	}
+
+	if (!name || members.length === 0) return;
+
+	await fetch("/create-group", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			name,
+			members,
+			owner: currentUser
+		})
+	});
+
+	document.getElementById("groupModal").remove();
+	loadQuickDials();
+}
+
+/* ----------------- load groups-------------------  */
+
+async function loadGroups() {
+	const res = await fetch("/get-groups", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ user: currentUser })
+	});
+
+	const data = await res.json();
+
+	console.log("loading groups for:", currentUser);
+	console.log("groups response:", data);
+
+	const box = document.getElementById("groupList");
+
+	if (!box) {
+		console.log("groupList element missing in DOM");
+		return;
+	}
+
+	box.innerHTML = "";
+
+	for (let g of data) {
+		const div = document.createElement("div");
+		div.className = "quick-item";
+
+		const span = document.createElement("span");
+		span.innerText = g.group_name;
+		span.style.cursor = "pointer";
+
+		span.onclick = () => {
+			openGroup(g.id, g.group_name);
+		};
+
+		const btn = document.createElement("button");
+		btn.innerText = "x";
+		btn.onclick = async () => {
+			await fetch("/leave-group", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					user: currentUser,
+					group_id: g.id
+				})
+			});
+
+			loadGroups();
+		};
+
+		div.appendChild(span);
+		div.appendChild(btn);
+		box.appendChild(div);
+	}
+}
+
+
+
+function openGroup(id, name) {
+	activeChatUser = null;
+	activeGroupId = id;
+
+	loadMessages();
 }
 
 /* ---------------- auth ---------------- */
@@ -128,9 +267,9 @@ async function login() {
 /* ---------------- chat open ---------------- */
 function openChat() {
 	const receiver = document.getElementById("receiver").value;
-
 	if (!receiver) return;
 
+	activeGroupId = null;
 	activeChatUser = receiver.toLowerCase();
 
 	loadMessages();
@@ -138,14 +277,12 @@ function openChat() {
 
 /* ---------------- send message ---------------- */
 async function sendMessage() {
-	if (!activeChatUser) return;
-
-	const msgInput = document.getElementById("msgText");
+	const content = document.getElementById("msgText").value;
 	const fileInputEl = document.getElementById("fileInput");
 
 	let fileData = null;
 	const file = fileInputEl.files[0];
-
+	
 	if (file && file.size > 100 * 1024 * 1024) {
 		alert("file too big (max 100mb)");
 		return;
@@ -163,20 +300,37 @@ async function sendMessage() {
 		fileData = await r.json();
 	}
 
-	await fetch("/send-message", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			sender: currentUser,
-			receiver: activeChatUser,
-			content: msgInput.value,
-			file_url: fileData?.url,
-			file_name: fileData?.name,
-			file_type: fileData?.type
-		})
-	});
+	// GROUP MESSAGE
+	if (activeGroupId) {
+		await fetch("/send-group-message", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				group_id: activeGroupId,
+				sender: currentUser,
+				content,
+				file_url: fileData?.url,
+				file_name: fileData?.name
+			})
+		});
+	}
 
-	msgInput.value = "";
+	// FRIEND MESSAGE
+	else if (activeChatUser) {
+		await fetch("/send-message", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				sender: currentUser,
+				receiver: activeChatUser,
+				content,
+				file_url: fileData?.url,
+				file_name: fileData?.name
+			})
+		});
+	}
+
+	document.getElementById("msgText").value = "";
 	fileInputEl.value = "";
 
 	loadMessages();
@@ -184,15 +338,27 @@ async function sendMessage() {
 
 /* ---------------- load messages ---------------- */
 async function loadMessages() {
-	if (!activeChatUser) return;
+	if (!activeChatUser && !activeGroupId) return;
 
-	const res = await fetch("/get-messages", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
+	let url;
+	let body;
+
+	// decide dm vs group
+	if (activeGroupId) {
+		url = "/get-group-messages";
+		body = { group_id: activeGroupId };
+	} else {
+		url = "/get-messages";
+		body = {
 			user1: currentUser,
 			user2: activeChatUser
-		})
+		};
+	}
+
+	const res = await fetch(url, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body)
 	});
 
 	const data = await res.json();
@@ -200,7 +366,6 @@ async function loadMessages() {
 	const box = document.getElementById("messages");
 	box.innerHTML = "";
 
-	// no messages case
 	if (!data || data.length === 0) {
 		box.innerHTML = `<div class="message">no messages :(</div>`;
 		return;
@@ -216,7 +381,7 @@ async function loadMessages() {
 		row.style.alignItems = "center";
 		row.style.gap = "8px";
 
-		// profile picture (optional)
+		// profile picture (ONLY for DMs usually)
 		if (msg.profile_pic) {
 			const img = document.createElement("img");
 			img.src = msg.profile_pic;
@@ -226,12 +391,13 @@ async function loadMessages() {
 			row.appendChild(img);
 		}
 
-		// text content
-		if (msg.content) {
-			const text = document.createElement("div");
-			text.innerText = `${msg.sender_username}: ${msg.content}`;
-			row.appendChild(text);
-		}
+		// sender name (important for groups)
+		const text = document.createElement("div");
+
+		const sender = msg.sender_username || "unknown";
+
+		text.innerText = `${sender}: ${msg.content || ""}`;
+		row.appendChild(text);
 
 		div.appendChild(row);
 
@@ -243,6 +409,7 @@ async function loadMessages() {
 				const img = document.createElement("img");
 				img.src = msg.file_url;
 
+				// auto scale (clean chat behavior)
 				img.style.maxWidth = "250px";
 				img.style.maxHeight = "250px";
 				img.style.width = "auto";

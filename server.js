@@ -223,6 +223,91 @@ app.post("/set-pfp", async (req, res) => {
 	}
 });
 
+/* ---------------- group ---------------- */
+
+app.post("/create-group", async (req, res) => {
+	const { name, members, owner } = req.body;
+
+	const result = await pool.query(
+		"INSERT INTO groups (group_name) VALUES ($1) RETURNING id",
+		[name]
+	);
+
+	const groupId = result.rows[0].id;
+
+	const allMembers = [...new Set([owner, ...members])];
+
+	for (let user of allMembers) {
+		await pool.query(
+			"INSERT INTO group_members (group_id, username) VALUES ($1,$2)",
+			[groupId, user.toLowerCase()]
+		);
+	}
+
+	res.send("ok");
+});
+
+app.post("/get-groups", async (req, res) => {
+	const { user } = req.body;
+
+	const result = await pool.query(`
+		SELECT g.id, g.group_name
+		FROM groups g
+		JOIN group_members m ON g.id = m.group_id
+		WHERE m.username = $1
+	`, [user.toLowerCase()]);
+
+	res.json(result.rows);
+});
+
+app.post("/leave-group", async (req, res) => {
+	const { group_id, user } = req.body;
+
+	await pool.query(
+		"DELETE FROM group_members WHERE group_id=$1 AND username=$2",
+		[group_id, user.toLowerCase()]
+	);
+
+	// delete group if empty
+	const check = await pool.query(
+		"SELECT * FROM group_members WHERE group_id=$1",
+		[group_id]
+	);
+
+	if (check.rows.length === 0) {
+		await pool.query("DELETE FROM groups WHERE id=$1", [group_id]);
+	}
+
+	res.send("ok");
+});
+
+app.post("/send-group-message", async (req, res) => {
+	const { group_id, sender, content, file_url, file_name } = req.body;
+
+	await pool.query(
+		`INSERT INTO group_messages
+		(group_id, sender_username, content, file_url, file_name)
+		VALUES ($1,$2,$3,$4,$5)`,
+		[group_id, sender.toLowerCase(), content || null, file_url || null, file_name || null]
+	);
+
+	res.send("ok");
+});
+
+app.post("/get-group-messages", async (req, res) => {
+	const { group_id } = req.body;
+
+	const result = await pool.query(
+		`SELECT * FROM group_messages
+		WHERE group_id=$1
+		ORDER BY id ASC`,
+		[group_id]
+	);
+
+	res.json(result.rows);
+});
+
+
 /* ---------------- start ---------------- */
 app.listen(3000, () => {
 	console.log("server running");
