@@ -25,7 +25,25 @@ const storage = multer.diskStorage({
 	}
 });
 
-const upload = multer({ storage });
+const upload = multer({
+	storage,
+	limits: {
+		fileSize: 200 * 1024 * 1024 // 200mb
+	}
+});
+
+const imageUpload = multer({
+	storage,
+	limits: {
+		fileSize: 50 * 1024 * 1024 // 50mb
+	},
+	fileFilter: (req, file, cb) => {
+		if (!file.mimetype.startsWith("image/")) {
+			return cb(new Error("only images allowed"));
+		}
+		cb(null, true);
+	}
+});
 
 /* ---------------- auth ---------------- */
 app.post("/register", async (req, res) => {
@@ -71,15 +89,21 @@ app.post("/login", async (req, res) => {
 
 /* ---------------- file upload ---------------- */
 app.post("/upload-file", upload.single("file"), async (req, res) => {
-	const f = req.file;
+	try {
+		if (!req.file) {
+			return res.status(400).send("no file");
+		}
 
-	res.json({
-		url: `/uploads/${f.filename}`,
-		name: f.originalname,
-		type: f.mimetype
-	});
+		res.json({
+			url: `/uploads/${req.file.filename}`,
+			name: req.file.originalname,
+			type: req.file.mimetype
+		});
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("upload error");
+	}
 });
-
 /* ---------------- messages ---------------- */
 app.post("/send-message", async (req, res) => {
 	const {
@@ -118,11 +142,13 @@ app.post("/get-messages", async (req, res) => {
 
 	try {
 		const result = await pool.query(
-			`SELECT * FROM messages
+			`SELECT messages.*, users.profile_pic
+			FROM messages
+			LEFT JOIN users ON users.username = messages.sender_username
 			WHERE (sender_username=$1 AND receiver_username=$2)
 			OR (sender_username=$2 AND receiver_username=$1)
 			ORDER BY id ASC`,
-			[user1.toLowerCase(), user2.toLowerCase()]
+			[user1.toLowerCase(), user2.toLowerCase()]		
 		);
 
 		res.json(result.rows);
@@ -164,6 +190,37 @@ app.post("/remove-quickdial", async (req, res) => {
 	);
 
 	res.send("ok");
+});
+
+/* profile picture */
+
+app.post("/upload-pfp", imageUpload.single("file"), async (req, res) => {
+	try {
+		const file = req.file;
+
+		res.json({
+			url: `/uploads/${file.filename}`
+		});
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("upload error");
+	}
+});
+
+app.post("/set-pfp", async (req, res) => {
+	const { username, url } = req.body;
+
+	try {
+		await pool.query(
+			"UPDATE users SET profile_pic=$1 WHERE username=$2",
+			[url, username.toLowerCase()]
+		);
+
+		res.send("ok");
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("error");
+	}
 });
 
 /* ---------------- start ---------------- */

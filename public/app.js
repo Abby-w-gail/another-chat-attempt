@@ -36,6 +36,7 @@ function renderApp() {
 	<div class="topbar">
 		<h2>chat</h2>
 		<span>${currentUser}</span>
+		<button onclick="openSettings()">settings</button>
 	</div>
 
 	<div class="chatContainer">
@@ -66,6 +67,27 @@ function renderApp() {
 	</div>`;
 }
 
+/* SETTINGS -------------------- */
+
+function openSettings() {
+	document.getElementById("app").innerHTML += `
+	<div class="center" id="settingsModal">
+		<div class="card">
+			<h3>profile settings</h3>
+
+			<input type="file" id="pfpFile" accept="image/*">
+			<button onclick="uploadPfp()">upload pfp</button>
+
+			<button onclick="closeSettings()">close</button>
+		</div>
+	</div>
+	`;
+}
+
+function closeSettings() {
+	document.getElementById("settingsModal").remove();
+}
+
 /* ---------------- chat ---------------- */
 function openChat() {
 	activeChatUser = receiver.value.toLowerCase();
@@ -78,6 +100,11 @@ async function sendMessage() {
 
 	let fileData = null;
 	const file = fileInput.files[0];
+
+	if (file && file.size > 100 * 1024 * 1024) {
+		alert("file too big (max 100mb sorry :/)");
+		return;
+	}
 
 	if (file) {
 		const fd = new FormData();
@@ -123,17 +150,39 @@ async function loadMessages() {
 	const box = document.getElementById("messages");
 	box.innerHTML = "";
 
-	for (let m of data) {
-		const d = document.createElement("div");
-		d.className = "message";
+	for (let msg of data) {
+		const div = document.createElement("div");
+		div.className = "message";
 
-		if (m.content)
-			d.innerHTML += `<div>${m.sender_username}: ${m.content}</div>`;
+		const row = document.createElement("div");
+		row.style.display = "flex";
+		row.style.alignItems = "center";
+		row.style.gap = "8px";
 
-		if (m.file_url)
-			d.innerHTML += `<a href="${m.file_url}" target="_blank">📎 ${m.file_name}</a>`;
+		if (msg.profile_pic) {
+			const img = document.createElement("img");
+			img.src = msg.profile_pic;
+			img.style.width = "28px";
+			img.style.height = "28px";
+			img.style.borderRadius = "50%";
+			row.appendChild(img);
+		}
 
-		box.appendChild(d);
+		const text = document.createElement("div");
+		text.innerText = `${msg.sender_username}: ${msg.content || ""}`;
+
+		row.appendChild(text);
+		div.appendChild(row);
+
+		if (msg.file_url) {
+			const file = document.createElement("a");
+			file.href = msg.file_url;
+			file.target = "_blank";
+			file.innerText = "📎 " + msg.file_name;
+			div.appendChild(file);
+		}
+
+		box.appendChild(div);
 	}
 }
 
@@ -185,4 +234,34 @@ function addQuickDial() {
 	});
 
 	loadQuickDials();
+}
+
+/* pfp add */
+
+async function uploadPfp() {
+	const file = document.getElementById("pfpFile").files[0];
+
+	if (!file) return;
+
+	const formData = new FormData();
+	formData.append("file", file);
+
+	const res = await fetch("/upload-pfp", {
+		method: "POST",
+		body: formData
+	});
+
+	const data = await res.json();
+
+	await fetch("/set-pfp", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			username: currentUser,
+			url: data.url
+		})
+	});
+
+	alert("pfp updated");
+	location.reload();
 }
