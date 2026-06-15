@@ -392,14 +392,46 @@ async function loadMessages() {
 			row.appendChild(img);
 		}
 
-		// sender name (important for groups)
-		const text = document.createElement("div");
-
+				// sender name (important for groups)
 		const sender = msg.sender_username || "unknown";
 
-		text.innerText = `${sender}: ${msg.content || ""}`;
-		row.appendChild(text);
+		/* -------- DATE -------- */
+		let formattedDate = "";
 
+		if (msg.sent_at) {
+			const date = new Date(String(msg.sent_at).replace(" ", "T"));
+
+			if (!isNaN(date.getTime())) {
+				const yyyy = date.getFullYear();
+				const mm = String(date.getMonth() + 1).padStart(2, "0");
+				const dd = String(date.getDate()).padStart(2, "0");
+
+				const hh = String(date.getHours()).padStart(2, "0");
+				const min = String(date.getMinutes()).padStart(2, "0");
+
+				formattedDate = `${yyyy}/${mm}/${dd} ${hh}:${min}`;
+			}
+		}
+
+		/* -------- TEXT LINE -------- */
+		const line = document.createElement("div");
+
+		const senderSpan = document.createElement("span");
+		senderSpan.innerText = sender + " - ";
+
+		const dateSpan = document.createElement("span");
+		dateSpan.innerText = formattedDate + " ";
+		dateSpan.style.fontSize = "12px";
+		dateSpan.style.color = "gray";
+
+		const msgSpan = document.createElement("span");
+		msgSpan.innerText = ": " + (msg.content || "");
+
+		line.appendChild(senderSpan);
+		line.appendChild(dateSpan);
+		line.appendChild(msgSpan);
+
+		row.appendChild(line);
 		div.appendChild(row);
 
 		// file handling
