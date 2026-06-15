@@ -58,7 +58,7 @@ button:hover {
 /* layout */
 .chatContainer {
 	display: flex;
-	height: calc(100vh - 50px);
+	height: calc(100vh - 90px);
 }
 
 
@@ -129,4 +129,15 @@ button:hover {
 
 #logoutBtn:hover {
 	background: #ff5c5c;
+}
+
+.quickdial {
+	width: 180px;
+	background: #15151c;
+	padding: 10px;
+
+	display: flex;
+	flex-direction: column;
+	
+	overflow-y: auto;
 }

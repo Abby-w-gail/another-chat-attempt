@@ -1,58 +1,6 @@
 let currentUser = null;
 let activeChatUser = null;
 
-/* ---------------- render login ---------------- */
-function renderLogin() {
-	document.getElementById("app").innerHTML = `
-		<div class="center">
-			<div class="card">
-				<h2>something about account login</h2>
-
-				<input id="username" placeholder="username">
-				<input id="password" type="password" placeholder="password">
-
-				<button onclick="register()">register</button>
-				<button onclick="login()">login</button>
-			</div>
-		</div>
-	`;
-}
-
-/* ---------------- render app ---------------- */
-function renderApp() {
-	document.getElementById("app").innerHTML = `
-		<div class="topbar">
-			<h2>messaged people, message people</h2>
-
-			<div>
-				<span id="status">${currentUser}</span>
-			</div>
-		</div>
-
-		<div class="chatContainer">
-
-			<div class="sidebar">
-				<h3>chat with</h3>
-
-				<input id="receiver" placeholder="username">
-				<button onclick="openChat()">open chat</button>
-			</div>
-
-			<div class="chat">
-
-				<div id="messages" class="messages"></div>
-
-				<div class="inputRow">
-					<input id="msgText" placeholder="message">
-					<button onclick="sendMessage()">send</button>
-				</div>
-
-			</div>
-
-		</div>
-	`;
-}
-
 /* ---------------- init ---------------- */
 window.onload = () => {
 	const saved = localStorage.getItem("user");
@@ -60,79 +8,84 @@ window.onload = () => {
 	if (saved) {
 		currentUser = saved;
 		renderApp();
+		loadQuickDials();
 	} else {
 		renderLogin();
 	}
 };
 
-/* ---------------- register ---------------- */
-async function register() {
-	const username = document.getElementById("username").value;
-	const password = document.getElementById("password").value;
-
-	const res = await fetch("/register", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ username, password })
-	});
-
-	alert(await res.text());
-}
-
 /* ---------------- login ---------------- */
-async function login() {
-	const username = document.getElementById("username").value;
-	const password = document.getElementById("password").value;
+function renderLogin() {
+	document.getElementById("app").innerHTML = `
+	<div class="center">
+		<div class="card">
+			<h2>login</h2>
 
-	const res = await fetch("/login", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ username, password })
-	});
+			<input id="username">
+			<input id="password" type="password">
 
-	if (res.ok) {
-		const data = await res.json();
-
-		currentUser = data.username;
-		localStorage.setItem("user", currentUser);
-
-		renderApp();
-	} else {
-		alert(await res.text());
-	}
+			<button onclick="login()">login</button>
+			<button onclick="register()">register</button>
+		</div>
+	</div>`;
 }
 
-/* ---------------- logout ---------------- */
-function logout() {
-	localStorage.removeItem("user");
-	currentUser = null;
-	activeChatUser = null;
+/* ---------------- app ---------------- */
+function renderApp() {
+	document.getElementById("app").innerHTML = `
+	<div class="topbar">
+		<h2>chat</h2>
+		<span>${currentUser}</span>
+	</div>
 
-	renderLogin();
+	<div class="chatContainer">
+
+		<div class="sidebar">
+			<h3>users</h3>
+
+			<input id="receiver">
+			<button onclick="openChat()">open chat</button>
+			<button onclick="addQuickDial()">add quickdial</button>
+		</div>
+
+		<div class="chat">
+			<div id="messages" class="messages"></div>
+
+			<div class="inputRow">
+				<input type="file" id="fileInput">
+				<input id="msgText">
+				<button onclick="sendMessage()">send</button>
+			</div>
+		</div>
+
+		<div class="quickdial">
+			<h3>keep yo real ones on quick dial</h3>
+			<div id="quickList"></div>
+		</div>
+
+	</div>`;
 }
 
-/* ---------------- open chat ---------------- */
+/* ---------------- chat ---------------- */
 function openChat() {
-	const receiver = document.getElementById("receiver").value;
-
-	if (!receiver) {
-		alert("enter a username first");
-		return;
-	}
-
-	activeChatUser = receiver.toLowerCase();
-
-	const box = document.getElementById("messages");
-	box.innerHTML = `<div class="message">chat opened with <b>${activeChatUser}</b></div>`;
-
+	activeChatUser = receiver.value.toLowerCase();
 	loadMessages();
 }
 
-/* ---------------- send message ---------------- */
+/* ---------------- send ---------------- */
 async function sendMessage() {
-	const content = document.getElementById("msgText").value;
+	if (!activeChatUser) return;
 
-	if (!activeChatUser || !content) return;
+	let fileData = null;
+	const file = fileInput.files[0];
+
+	if (file) {
+		const fd = new FormData();
+		fd.append("file", file);
+
+		const r = await fetch("/upload-file", { method: "POST", body: fd });
+		fileData = await r.json();
+	}
 
 	await fetch("/send-message", {
 		method: "POST",
@@ -140,23 +93,21 @@ async function sendMessage() {
 		body: JSON.stringify({
 			sender: currentUser,
 			receiver: activeChatUser,
-			content
+			content: msgText.value,
+			file_url: fileData?.url,
+			file_name: fileData?.name,
+			file_type: fileData?.type
 		})
 	});
-	
-	console.log("sent message to:", activeChatUser);
 
-	document.getElementById("msgText").value = "";
+	msgText.value = "";
+	fileInput.value = "";
 	loadMessages();
 }
 
-/* ---------------- load messages ---------------- */
+/* ---------------- load ---------------- */
 async function loadMessages() {
-	if (!activeChatUser) {
-		const box = document.getElementById("messages");
-		box.innerHTML = `<div class="message">no chat selected :(</div>`;
-		return;
-	}
+	if (!activeChatUser) return;
 
 	const res = await fetch("/get-messages", {
 		method: "POST",
@@ -172,24 +123,66 @@ async function loadMessages() {
 	const box = document.getElementById("messages");
 	box.innerHTML = "";
 
-	// if no messages exist
-	if (!data || data.length === 0) {
-		box.innerHTML = `<div class="message">no messages :(</div>`;
-		return;
-	}
+	for (let m of data) {
+		const d = document.createElement("div");
+		d.className = "message";
 
-	for (let msg of data) {
-		const div = document.createElement("div");
-		div.className = "message";
-		div.innerText = `${msg.sender_username}: ${msg.content}`;
-		box.appendChild(div);
-	}
+		if (m.content)
+			d.innerHTML += `<div>${m.sender_username}: ${m.content}</div>`;
 
-	box.scrollTop = box.scrollHeight;
+		if (m.file_url)
+			d.innerHTML += `<a href="${m.file_url}" target="_blank">📎 ${m.file_name}</a>`;
+
+		box.appendChild(d);
+	}
 }
 
-/* ---------------- auto refresh chat ---------------- */
-setInterval(() => {
-	if (!currentUser || !activeChatUser) return;
-	loadMessages();
-}, 2000);
+/* ---------------- quick ---------------- */
+async function loadQuickDials() {
+	const res = await fetch("/get-quickdials", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ user: currentUser })
+	});
+
+	const data = await res.json();
+
+	const box = document.getElementById("quickList");
+	box.innerHTML = "";
+
+	for (let q of data) {
+		const d = document.createElement("div");
+
+		d.innerHTML = `
+			<span onclick="openQuick('${q.target_user}')">${q.target_user}</span>
+			<button onclick="removeQuick('${q.target_user}')">x</button>
+		`;
+
+		box.appendChild(d);
+	}
+}
+
+function openQuick(u) {
+	receiver.value = u;
+	openChat();
+}
+
+async function removeQuick(t) {
+	await fetch("/remove-quickdial", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ user: currentUser, target: t })
+	});
+
+	loadQuickDials();
+}
+
+function addQuickDial() {
+	fetch("/add-quickdial", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ user: currentUser, target: receiver.value })
+	});
+
+	loadQuickDials();
+}

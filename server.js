@@ -3,122 +3,170 @@ require("dotenv").config();
 const express = require("express");
 const bcrypt = require("bcrypt");
 const { Pool } = require("pg");
+const multer = require("multer");
 
 const app = express();
 
 app.use(express.json());
 app.use(express.static("public"));
+app.use("/uploads", express.static("uploads"));
 
-/* ---------------- db connection ---------------- */
+/* ---------------- db ---------------- */
 const pool = new Pool({
 	connectionString: process.env.DATABASE_URL,
 	ssl: { rejectUnauthorized: false }
 });
 
-/* ---------------- test db connection ---------------- */
-pool.query("SELECT NOW()")
-	.then(() => console.log("db connected"))
-	.catch(err => console.log("db connection failed:", err));
+/* ---------------- upload ---------------- */
+const storage = multer.diskStorage({
+	destination: "uploads/",
+	filename: (req, file, cb) => {
+		cb(null, Date.now() + "-" + file.originalname);
+	}
+});
 
-/* ---------------- register ---------------- */
+const upload = multer({ storage });
+
+/* ---------------- auth ---------------- */
 app.post("/register", async (req, res) => {
 	const { username, password } = req.body;
 
 	try {
-		const user = username.toLowerCase();
 		const hashed = await bcrypt.hash(password, 10);
 
 		await pool.query(
-			`INSERT INTO users (username, password_hash)
-			 VALUES ($1, $2)`,
-			[user, hashed]
+			"INSERT INTO users (username, password_hash) VALUES ($1, $2)",
+			[username.toLowerCase(), hashed]
 		);
 
-		res.send("user created");
-	} catch (err) {
-		console.log("register error:", err);
-		res.status(500).send(err.message);
+		res.send("ok");
+	} catch (e) {
+		console.log(e);
+		res.status(500).send("error");
 	}
 });
 
-/* ---------------- login ---------------- */
 app.post("/login", async (req, res) => {
 	const { username, password } = req.body;
 
 	try {
-		const user = username.toLowerCase();
-
 		const result = await pool.query(
-			`SELECT * FROM users WHERE username = $1`,
-			[user]
+			"SELECT * FROM users WHERE username = $1",
+			[username.toLowerCase()]
 		);
 
-		if (result.rows.length === 0) {
-			return res.status(400).send("no user");
-		}
+		if (result.rows.length === 0) return res.status(400).send("no user");
 
-		const dbUser = result.rows[0];
+		const user = result.rows[0];
 
-		const match = await bcrypt.compare(password, dbUser.password_hash);
+		const ok = await bcrypt.compare(password, user.password_hash);
+		if (!ok) return res.status(400).send("wrong password");
 
-		if (!match) {
-			return res.status(400).send("wrong password");
-		}
-
-		res.json({ username: dbUser.username });
-	} catch (err) {
-		console.log("login error:", err);
-		res.status(500).send(err.message);
+		res.json({ username: user.username });
+	} catch (e) {
+		console.log(e);
+		res.status(500).send("login error");
 	}
 });
 
-/* ---------------- send message ---------------- */
+/* ---------------- file upload ---------------- */
+app.post("/upload-file", upload.single("file"), async (req, res) => {
+	const f = req.file;
+
+	res.json({
+		url: `/uploads/${f.filename}`,
+		name: f.originalname,
+		type: f.mimetype
+	});
+});
+
+/* ---------------- messages ---------------- */
 app.post("/send-message", async (req, res) => {
-	const { sender, receiver, content, image_url } = req.body;
+	const {
+		sender,
+		receiver,
+		content,
+		file_url,
+		file_name,
+		file_type
+	} = req.body;
 
 	try {
-		console.log("message received:", req.body);
-
 		await pool.query(
 			`INSERT INTO messages
-			 (sender_username, receiver_username, content, image_url)
-			 VALUES ($1, $2, $3, $4)`,
+			(sender_username, receiver_username, content, file_url, file_name, file_type)
+			VALUES ($1,$2,$3,$4,$5,$6)`,
 			[
 				sender.toLowerCase(),
 				receiver.toLowerCase(),
-				content,
-				image_url || null
+				content || null,
+				file_url || null,
+				file_name || null,
+				file_type || null
 			]
 		);
 
-		res.send("message stored");
-	} catch (err) {
-		console.log("send-message error:", err);
-		res.status(500).send(err.message);
+		res.send("ok");
+	} catch (e) {
+		console.log(e);
+		res.status(500).send("error");
 	}
 });
 
-/* ---------------- get messages ---------------- */
 app.post("/get-messages", async (req, res) => {
 	const { user1, user2 } = req.body;
 
 	try {
 		const result = await pool.query(
 			`SELECT * FROM messages
-			 WHERE (sender_username = $1 AND receiver_username = $2)
-			 OR (sender_username = $2 AND receiver_username = $1)
-			 ORDER BY sent_at ASC`,
+			WHERE (sender_username=$1 AND receiver_username=$2)
+			OR (sender_username=$2 AND receiver_username=$1)
+			ORDER BY id ASC`,
 			[user1.toLowerCase(), user2.toLowerCase()]
 		);
 
 		res.json(result.rows);
-	} catch (err) {
-		console.log("get-messages error:", err);
-		res.status(500).send(err.message);
+	} catch (e) {
+		console.log(e);
+		res.status(500).send("error");
 	}
 });
 
-/* ---------------- start server ---------------- */
+/* ---------------- quickdials ---------------- */
+app.post("/add-quickdial", async (req, res) => {
+	const { user, target } = req.body;
+
+	await pool.query(
+		"INSERT INTO quickdials (user_owner, target_user) VALUES ($1,$2)",
+		[user.toLowerCase(), target.toLowerCase()]
+	);
+
+	res.send("ok");
+});
+
+app.post("/get-quickdials", async (req, res) => {
+	const { user } = req.body;
+
+	const result = await pool.query(
+		"SELECT target_user FROM quickdials WHERE user_owner=$1",
+		[user.toLowerCase()]
+	);
+
+	res.json(result.rows);
+});
+
+app.post("/remove-quickdial", async (req, res) => {
+	const { user, target } = req.body;
+
+	await pool.query(
+		"DELETE FROM quickdials WHERE user_owner=$1 AND target_user=$2",
+		[user.toLowerCase(), target.toLowerCase()]
+	);
+
+	res.send("ok");
+});
+
+/* ---------------- start ---------------- */
 app.listen(3000, () => {
-	console.log("server running on http://localhost:3000");
+	console.log("server running");
 });
