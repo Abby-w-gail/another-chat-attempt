@@ -534,6 +534,15 @@ async function uploadPfp() {
 /* */
 
 setInterval(() => {
-	if (!currentUser || !activeChatUser) return;
-	loadMessages();
-}, 1000);
+	if (!currentUser) return;
+
+	// DM chat open
+	if (activeChatUser) {
+		loadMessages();
+	}
+
+	// group chat open
+	else if (activeGroupId) {
+		loadMessages();
+	}
+}, 1500);
