@@ -332,3 +332,10 @@ async function uploadPfp() {
 	alert("pfp updated");
 	location.reload();
 }
+
+/* */
+
+setInterval(() => {
+	if (!currentUser || !activeChatUser) return;
+	loadMessages();
+}, 1000);
