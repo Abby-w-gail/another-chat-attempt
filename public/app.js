@@ -200,7 +200,8 @@ async function loadMessages() {
 	const box = document.getElementById("messages");
 	box.innerHTML = "";
 
-	if (!data.length) {
+	// no messages case
+	if (!data || data.length === 0) {
 		box.innerHTML = `<div class="message">no messages :(</div>`;
 		return;
 	}
@@ -209,11 +210,13 @@ async function loadMessages() {
 		const div = document.createElement("div");
 		div.className = "message";
 
+		// row (pfp + text)
 		const row = document.createElement("div");
 		row.style.display = "flex";
 		row.style.alignItems = "center";
 		row.style.gap = "8px";
 
+		// profile picture (optional)
 		if (msg.profile_pic) {
 			const img = document.createElement("img");
 			img.src = msg.profile_pic;
@@ -223,18 +226,43 @@ async function loadMessages() {
 			row.appendChild(img);
 		}
 
-		const text = document.createElement("div");
-		text.innerText = `${msg.sender_username}: ${msg.content || ""}`;
+		// text content
+		if (msg.content) {
+			const text = document.createElement("div");
+			text.innerText = `${msg.sender_username}: ${msg.content}`;
+			row.appendChild(text);
+		}
 
-		row.appendChild(text);
 		div.appendChild(row);
 
+		// file handling
 		if (msg.file_url) {
-			const file = document.createElement("a");
-			file.href = msg.file_url;
-			file.target = "_blank";
-			file.innerText = "📎 " + msg.file_name;
-			div.appendChild(file);
+			const isImage = msg.file_type?.startsWith("image/");
+
+			if (isImage) {
+				const img = document.createElement("img");
+				img.src = msg.file_url;
+
+				img.style.maxWidth = "250px";
+				img.style.maxHeight = "250px";
+				img.style.width = "auto";
+				img.style.height = "auto";
+				img.style.borderRadius = "10px";
+				img.style.marginTop = "6px";
+				img.style.display = "block";
+
+				div.appendChild(img);
+			} else {
+				const file = document.createElement("a");
+				file.href = msg.file_url;
+				file.target = "_blank";
+				file.innerText = "📎 " + msg.file_name;
+
+				file.style.display = "inline-block";
+				file.style.marginTop = "6px";
+
+				div.appendChild(file);
+			}
 		}
 
 		box.appendChild(div);
