@@ -297,14 +297,21 @@ app.post("/send-group-message", async (req, res) => {
 app.post("/get-group-messages", async (req, res) => {
 	const { group_id } = req.body;
 
-	const result = await pool.query(
-		`SELECT * FROM group_messages
-		WHERE group_id=$1
-		ORDER BY id ASC`,
-		[group_id]
-	);
+	try {
+		const result = await pool.query(
+			`SELECT gm.*, u.profile_pic
+			FROM group_messages gm
+			LEFT JOIN users u ON u.username = gm.sender_username
+			WHERE gm.group_id = $1
+			ORDER BY gm.id ASC`,
+			[group_id]
+		);
 
-	res.json(result.rows);
+		res.json(result.rows);
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("error");
+	}
 });
 
 
