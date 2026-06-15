@@ -60,7 +60,7 @@ function renderApp() {
 		</div>
 
 		<div class="quickdial">
-			<h3>quick dials</h3>
+			<h3>get yo real ones on quick dial</h3>
 			<div id="quickList"></div>
 		</div>
 
