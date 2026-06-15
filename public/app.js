@@ -14,15 +14,15 @@ window.onload = () => {
 	}
 };
 
-/* ---------------- login ---------------- */
+/* ---------------- login screen ---------------- */
 function renderLogin() {
 	document.getElementById("app").innerHTML = `
 	<div class="center">
 		<div class="card">
 			<h2>login</h2>
 
-			<input id="username">
-			<input id="password" type="password">
+			<input id="username" placeholder="username">
+			<input id="password" type="password" placeholder="password">
 
 			<button onclick="login()">login</button>
 			<button onclick="register()">register</button>
@@ -30,7 +30,7 @@ function renderLogin() {
 	</div>`;
 }
 
-/* ---------------- app ---------------- */
+/* ---------------- main app ---------------- */
 function renderApp() {
 	document.getElementById("app").innerHTML = `
 	<div class="topbar">
@@ -44,7 +44,7 @@ function renderApp() {
 		<div class="sidebar">
 			<h3>users</h3>
 
-			<input id="receiver">
+			<input id="receiver" placeholder="username">
 			<button onclick="openChat()">open chat</button>
 			<button onclick="addQuickDial()">add quickdial</button>
 		</div>
@@ -54,23 +54,22 @@ function renderApp() {
 
 			<div class="inputRow">
 				<input type="file" id="fileInput">
-				<input id="msgText">
+				<input id="msgText" placeholder="message">
 				<button onclick="sendMessage()">send</button>
 			</div>
 		</div>
 
 		<div class="quickdial">
-			<h3>keep yo real ones on quick dial</h3>
+			<h3>quick dials</h3>
 			<div id="quickList"></div>
 		</div>
 
 	</div>`;
 }
 
-/* SETTINGS -------------------- */
-
+/* ---------------- settings ---------------- */
 function openSettings() {
-	document.getElementById("app").innerHTML += `
+	document.body.insertAdjacentHTML("beforeend", `
 	<div class="center" id="settingsModal">
 		<div class="card">
 			<h3>profile settings</h3>
@@ -81,28 +80,74 @@ function openSettings() {
 			<button onclick="closeSettings()">close</button>
 		</div>
 	</div>
-	`;
+	`);
 }
 
 function closeSettings() {
-	document.getElementById("settingsModal").remove();
+	document.getElementById("settingsModal")?.remove();
 }
 
-/* ---------------- chat ---------------- */
+/* ---------------- auth ---------------- */
+async function register() {
+	const username = document.getElementById("username").value;
+	const password = document.getElementById("password").value;
+
+	await fetch("/register", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ username, password })
+	});
+
+	alert("user created");
+}
+
+async function login() {
+	const username = document.getElementById("username").value;
+	const password = document.getElementById("password").value;
+
+	const res = await fetch("/login", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ username, password })
+	});
+
+	if (!res.ok) {
+		alert(await res.text());
+		return;
+	}
+
+	const data = await res.json();
+
+	currentUser = data.username;
+	localStorage.setItem("user", currentUser);
+
+	renderApp();
+	loadQuickDials();
+}
+
+/* ---------------- chat open ---------------- */
 function openChat() {
-	activeChatUser = receiver.value.toLowerCase();
+	const receiver = document.getElementById("receiver").value;
+
+	if (!receiver) return;
+
+	activeChatUser = receiver.toLowerCase();
+
 	loadMessages();
 }
 
-/* ---------------- send ---------------- */
+/* ---------------- send message ---------------- */
 async function sendMessage() {
 	if (!activeChatUser) return;
 
+	const msgInput = document.getElementById("msgText");
+	const fileInputEl = document.getElementById("fileInput");
+
 	let fileData = null;
-	const file = fileInput.files[0];
+	const file = fileInputEl.files[0];
 
 	if (file && file.size > 100 * 1024 * 1024) {
-		alert("file too big (max 100mb sorry :/)");
+		alert("file too big (max 100mb)");
 		return;
 	}
 
@@ -110,7 +155,11 @@ async function sendMessage() {
 		const fd = new FormData();
 		fd.append("file", file);
 
-		const r = await fetch("/upload-file", { method: "POST", body: fd });
+		const r = await fetch("/upload-file", {
+			method: "POST",
+			body: fd
+		});
+
 		fileData = await r.json();
 	}
 
@@ -120,19 +169,20 @@ async function sendMessage() {
 		body: JSON.stringify({
 			sender: currentUser,
 			receiver: activeChatUser,
-			content: msgText.value,
+			content: msgInput.value,
 			file_url: fileData?.url,
 			file_name: fileData?.name,
 			file_type: fileData?.type
 		})
 	});
 
-	msgText.value = "";
-	fileInput.value = "";
+	msgInput.value = "";
+	fileInputEl.value = "";
+
 	loadMessages();
 }
 
-/* ---------------- load ---------------- */
+/* ---------------- load messages ---------------- */
 async function loadMessages() {
 	if (!activeChatUser) return;
 
@@ -149,6 +199,11 @@ async function loadMessages() {
 
 	const box = document.getElementById("messages");
 	box.innerHTML = "";
+
+	if (!data.length) {
+		box.innerHTML = `<div class="message">no messages :(</div>`;
+		return;
+	}
 
 	for (let msg of data) {
 		const div = document.createElement("div");
@@ -184,9 +239,11 @@ async function loadMessages() {
 
 		box.appendChild(div);
 	}
+
+	box.scrollTop = box.scrollHeight;
 }
 
-/* ---------------- quick ---------------- */
+/* ---------------- quickdials ---------------- */
 async function loadQuickDials() {
 	const res = await fetch("/get-quickdials", {
 		method: "POST",
@@ -203,7 +260,9 @@ async function loadQuickDials() {
 		const d = document.createElement("div");
 
 		d.innerHTML = `
-			<span onclick="openQuick('${q.target_user}')">${q.target_user}</span>
+			<span onclick="openQuick(\`${q.target_user}\`)">
+				${q.target_user}
+			</span>
 			<button onclick="removeQuick('${q.target_user}')">x</button>
 		`;
 
@@ -211,44 +270,52 @@ async function loadQuickDials() {
 	}
 }
 
-function openQuick(u) {
-	receiver.value = u;
+function openQuick(user) {
+	document.getElementById("receiver").value = user;
 	openChat();
 }
 
-async function removeQuick(t) {
+async function removeQuick(target) {
 	await fetch("/remove-quickdial", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ user: currentUser, target: t })
+		body: JSON.stringify({
+			user: currentUser,
+			target
+		})
 	});
 
 	loadQuickDials();
 }
 
-function addQuickDial() {
-	fetch("/add-quickdial", {
+async function addQuickDial() {
+	const target = document.getElementById("receiver").value;
+
+	if (!target) return;
+
+	await fetch("/add-quickdial", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ user: currentUser, target: receiver.value })
+		body: JSON.stringify({
+			user: currentUser,
+			target
+		})
 	});
 
 	loadQuickDials();
 }
 
-/* pfp add */
-
+/* ---------------- profile pic ---------------- */
 async function uploadPfp() {
 	const file = document.getElementById("pfpFile").files[0];
-
 	if (!file) return;
 
-	const formData = new FormData();
-	formData.append("file", file);
+	const fd = new FormData();
+	fd.append("file", file);
 
 	const res = await fetch("/upload-pfp", {
 		method: "POST",
-		body: formData
+		body: fd
 	});
 
 	const data = await res.json();
