@@ -18,5 +18,11 @@
   "bugs": {
     "url": "https://github.com/Abby-w-gail/another-chat-attempt/issues"
   },
-  "homepage": "https://github.com/Abby-w-gail/another-chat-attempt#readme"
+  "homepage": "https://github.com/Abby-w-gail/another-chat-attempt#readme",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pg": "^8.21.0"
+  }
 }
