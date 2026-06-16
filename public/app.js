@@ -597,11 +597,11 @@ async function uploadPfp() {
 function changeCSS() {
 	const css = document.getElementById("theme");
 
-	if (css.href.includes("style2.css")) {
-		css.href = "style.css";
+	if (css.href.includes("style.css")) {
+		css.href = "style2.css";
 		localStorage.setItem("theme", "forum");
 	} else {
-		css.href = "style2.css";
+		css.href = "style.css";
 		localStorage.setItem("theme", "dark");
 	}
 }
