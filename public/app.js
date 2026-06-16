@@ -66,17 +66,16 @@ function renderApp() {
 		</div>
 
 		<div class="quickdial">
-			<a class="icon" href="https://voice.abbyw.net">press this to join the global big voice chat</a>
 			<h3>groups</h3>
 			<div id="groupList"></div>
 			<h3>get yo real ones on quick dial</h3>
 			<div id="quickList"></div>
 		</div>
 		
-		
 
 
-	</div>`;
+	</div>
+	<a class="icon" href="https://voice.abbyw.net">press this to join the global big voice chat</a>`;
 }
 
 /* ---------------- settings ---------------- */
