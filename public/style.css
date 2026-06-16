@@ -56,18 +56,14 @@ button:hover {
 
 /* top */
 .topbar {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
+	display:flex;
+	justify-content:space-between;
+	align-items:center;
 
-	background: white;
-	border: 1px solid #aaa;
+	background:white;
+	border-bottom:1px solid #aaa;
 
-	padding: 10px;
-	margin: 20px auto 0 auto;
-
-	width: calc(100% - 40px);
-	max-width: 1000px;
+	padding:10px;
 }
 
 
@@ -80,25 +76,29 @@ button:hover {
 
 /* main layout */
 .chatContainer {
-	display: flex;
-	width: 1000px;
-	margin: 10px auto;
-	gap: 10px;
-	height: 80vh;
+	display:flex;
+	width:100%;
+	height:calc(100vh - 90px);
+
+	margin:0;
+	gap:0;
 }
 
 
 /* left */
 .sidebar {
-	width: 200px;
-	background: white;
-	border: 1px solid #aaa;
+	width:200px;
 
-	padding: 10px;
+	background:white;
+	border-right:1px solid #aaa;
+
+	padding:10px;
 
 	display:flex;
 	flex-direction:column;
 	gap:10px;
+
+	flex-shrink:0;
 }
 
 
@@ -107,28 +107,30 @@ button:hover {
 	flex:1;
 
 	background:white;
-	border:1px solid #aaa;
 
 	padding:10px;
 
 	display:flex;
 	flex-direction:column;
+
+	min-width:0;
 }
 
 
 /* messages */
 .messages {
 	flex:1;
+
 	overflow-y:auto;
 
 	border:1px solid #ddd;
 
 	padding:5px;
+
 	margin-bottom:10px;
 
 	display:flex;
 	flex-direction:column;
-	gap:0;
 }
 
 
@@ -190,11 +192,11 @@ button:hover {
 
 /* right side */
 .quickdial {
-	width:250px;
+	width:220px;
 
 	background:white;
 
-	border:1px solid #aaa;
+	border-left:1px solid #aaa;
 
 	padding:10px;
 
@@ -202,6 +204,8 @@ button:hover {
 	flex-direction:column;
 
 	overflow-y:auto;
+
+	flex-shrink:0;
 }
 
 

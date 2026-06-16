@@ -75,7 +75,7 @@ function renderApp() {
 
 
 	</div>
-	<a class="icon" href="https://voice.abbyw.net">press this to join the global big voice chat</a>`;
+	`;
 }
 
 /* ---------------- settings ---------------- */
@@ -88,7 +88,7 @@ function openSettings() {
 
 			<input type="file" id="pfpFile" accept="image/*">
 			<button onclick="uploadPfp()">upload pfp</button>
-
+			<a class="icon" href="https://voice.abbyw.net">press this to join the global big voice chat</a>
 			<button onclick="closeSettings()">close</button>
 		</div>
 	</div>
