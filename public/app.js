@@ -6,6 +6,12 @@ let activeGroupId = null;
 /* ---------------- init ---------------- */
 window.onload = () => {
 	const saved = localStorage.getItem("user");
+	
+	const savedTheme = localStorage.getItem("theme");
+
+	if (savedTheme) {
+		document.getElementById("theme").href = savedTheme;
+	}
 
 	if (saved) {
 		currentUser = saved;
@@ -599,10 +605,12 @@ function changeCSS() {
 
 	if (css.href.includes("style.css")) {
 		css.href = "style2.css";
-		localStorage.setItem("theme", "forum");
+		css.setAttribute("href", "style2.css");
+		localStorage.setItem("theme", "style2.css");
 	} else {
 		css.href = "style.css";
-		localStorage.setItem("theme", "dark");
+		css.setAttribute("href", "style.css");
+		localStorage.setItem("theme", "style.css");
 	}
 }
 /* */
