@@ -112,21 +112,23 @@ app.post("/send-message", async (req, res) => {
 		content,
 		file_url,
 		file_name,
-		file_type
+		file_type,
+		image_data
 	} = req.body;
 
 	try {
 		await pool.query(
 			`INSERT INTO messages
-			(sender_username, receiver_username, content, file_url, file_name, file_type)
-			VALUES ($1,$2,$3,$4,$5,$6)`,
+			(sender_username, receiver_username, content, file_url, file_name, file_type, image_data)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 			[
 				sender.toLowerCase(),
 				receiver.toLowerCase(),
 				content || null,
 				file_url || null,
 				file_name || null,
-				file_type || null
+				file_type || null,
+				image_data || null
 			]
 		);
 
@@ -282,16 +284,35 @@ app.post("/leave-group", async (req, res) => {
 });
 
 app.post("/send-group-message", async (req, res) => {
-	const { group_id, sender, content, file_url, file_name } = req.body;
+	const {
+		group_id,
+		sender,
+		content,
+		file_url,
+		file_name,
+		image_data
+	} = req.body;
 
-	await pool.query(
-		`INSERT INTO group_messages
-		(group_id, sender_username, content, file_url, file_name)
-		VALUES ($1,$2,$3,$4,$5)`,
-		[group_id, sender.toLowerCase(), content || null, file_url || null, file_name || null]
-	);
+	try {
+		await pool.query(
+			`INSERT INTO group_messages
+			(group_id, sender_username, content, file_url, file_name, image_data)
+			VALUES ($1,$2,$3,$4,$5,$6)`,
+			[
+				group_id,
+				sender.toLowerCase(),
+				content || null,
+				file_url || null,
+				file_name || null,
+				image_data || null
+			]
+		);
 
-	res.send("ok");
+		res.send("ok");
+	} catch (e) {
+		console.log(e);
+		res.status(500).send("error");
+	}
 });
 
 app.post("/get-group-messages", async (req, res) => {

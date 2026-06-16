@@ -281,6 +281,8 @@ async function sendMessage() {
 	const fileInputEl = document.getElementById("fileInput");
 
 	let fileData = null;
+	let imageData = null;
+
 	const file = fileInputEl.files[0];
 	
 	if (file && file.size > 100 * 1024 * 1024) {
@@ -288,17 +290,42 @@ async function sendMessage() {
 		return;
 	}
 
-	if (file) {
-		const fd = new FormData();
-		fd.append("file", file);
+	if (file && file.type.startsWith("image/")) {
+		const reader = new FileReader();
 
-		const r = await fetch("/upload-file", {
-			method: "POST",
-			body: fd
+		imageData = await new Promise((resolve) => {
+			reader.onload = () => resolve(reader.result);
+			reader.readAsDataURL(file);
 		});
-
-		fileData = await r.json();
 	}
+
+	if (file) {
+
+		if (file.type.startsWith("image/")) {
+
+			imageData = await new Promise((resolve) => {
+				const reader = new FileReader();
+
+				reader.onload = () => resolve(reader.result);
+
+				reader.readAsDataURL(file);
+			});
+
+		} else {
+
+			const fd = new FormData();
+			fd.append("file", file);
+
+			const r = await fetch("/upload-file", {
+				method: "POST",
+				body: fd
+			});
+
+			fileData = await r.json();
+		}
+	}
+	
+	
 
 	// GROUP MESSAGE
 	if (activeGroupId) {
@@ -311,7 +338,8 @@ async function sendMessage() {
 				content,
 				file_url: fileData?.url,
 				file_name: fileData?.name,
-				file_type: fileData?.type
+				file_type: fileData?.type,
+				image_data: imageData
 			})
 		});
 	}
@@ -326,7 +354,8 @@ async function sendMessage() {
 				receiver: activeChatUser,
 				content,
 				file_url: fileData?.url,
-				file_name: fileData?.name
+				file_name: fileData?.name,
+				image_data: imageData
 			})
 		});
 	}
@@ -435,36 +464,35 @@ async function loadMessages() {
 		div.appendChild(row);
 
 		// file handling
-		if (msg.file_url) {
-			const isImage =
-				msg.file_type?.startsWith("image/") ||
-				msg.file_url?.match(/\.(png|jpg|jpeg|gif|webp)$/i);
+		// image handling (base64)
+		if (msg.image_data) {
+			const img = document.createElement("img");
 
-			if (isImage) {
-				const img = document.createElement("img");
-				img.src = msg.file_url;
+			img.src = msg.image_data;
 
-				// auto scale (clean chat behavior)
-				img.style.maxWidth = "250px";
-				img.style.maxHeight = "250px";
-				img.style.width = "auto";
-				img.style.height = "auto";
-				img.style.borderRadius = "10px";
-				img.style.marginTop = "6px";
-				img.style.display = "block";
+			img.style.maxWidth = "250px";
+			img.style.maxHeight = "250px";
+			img.style.width = "auto";
+			img.style.height = "auto";
+			img.style.borderRadius = "10px";
+			img.style.marginTop = "6px";
+			img.style.display = "block";
 
-				div.appendChild(img);
-			} else {
-				const file = document.createElement("a");
-				file.href = msg.file_url;
-				file.target = "_blank";
-				file.innerText = "📎 " + msg.file_name;
+			div.appendChild(img);
+		}
 
-				file.style.display = "inline-block";
-				file.style.marginTop = "6px";
+		// normal file handling
+		else if (msg.file_url) {
+			const file = document.createElement("a");
 
-				div.appendChild(file);
-			}
+			file.href = msg.file_url;
+			file.download = msg.file_name || "download";
+			file.innerText = "📎 " + (msg.file_name || "download file");
+
+			file.style.display = "inline-block";
+			file.style.marginTop = "6px";
+
+			div.appendChild(file);
 		}
 
 		box.appendChild(div);
