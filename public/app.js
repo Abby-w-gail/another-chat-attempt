@@ -83,6 +83,7 @@ function openSettings() {
 	document.body.insertAdjacentHTML("beforeend", `
 	<div class="center" id="settingsModal">
 		<div class="card">
+			<button onclick="changeCSS()">change css</button>
 			<h3>profile settings</h3>
 
 			<input type="file" id="pfpFile" accept="image/*">
@@ -593,7 +594,17 @@ async function uploadPfp() {
 	alert("pfp updated");
 	location.reload();
 }
+function changeCSS() {
+	const css = document.getElementById("theme");
 
+	if (css.href.includes("style2.css")) {
+		css.href = "style.css";
+		localStorage.setItem("theme", "forum");
+	} else {
+		css.href = "style2.css";
+		localStorage.setItem("theme", "dark");
+	}
+}
 /* */
 
 setInterval(() => {
@@ -608,4 +619,4 @@ setInterval(() => {
 	else if (activeGroupId) {
 		loadMessages();
 	}
-}, 1500);
+}, 3000);
